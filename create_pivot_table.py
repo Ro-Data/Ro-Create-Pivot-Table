@@ -6,7 +6,10 @@ import collections
 import psycopg2
 
 from generate_pivot_query import _generate_pivot_query
-from create_table_from_select import create_table_from_select
+from create_table_from_select import (
+    create_table_from_select,
+    get_connection_dict_from_airflow
+)
 
 
 def _create_pivot_table(cursor, *args, **kwargs):
