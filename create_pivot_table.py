@@ -3,8 +3,6 @@
 
 import collections
 
-import psycopg2
-
 import generate_pivot_query as generate
 import create_table_from_select as create
 
@@ -21,8 +19,14 @@ def _create_pivot_table(cursor, *args, **kwargs):
     )
 
 
-def create_pivot_table(connection_dict, *args, **kwargs):
-    with psycopg2.connect(**connection_dict) as connection:
+def create_pivot_table(dbtype, connection_dict, *args, **kwargs):
+    if dbtype == 'snowflake':
+        import snowflake.connector
+        connector = snowflake.connector.connect
+    else:
+        import psycopg2
+        connector = psycopg2.connect
+    with connector(**connection_dict) as connection:
         cursor = connection.cursor()
         _create_pivot_table(cursor, *args, **kwargs)
 
@@ -34,9 +38,12 @@ if __name__ == '__main__':
     parser.add_argument('source_schema')
     parser.add_argument('source_table')
     parser.add_argument('table_name')
-    parser.add_argument('--airflow-postgres-conn-id')
+    parser.add_argument('--dbtype')
     parser.add_argument('--host')
     parser.add_argument('--dbname')
+    parser.add_argument('--database')
+    parser.add_argument('--account')
+    parser.add_argument('--warehouse')
     parser.add_argument('--port')
     parser.add_argument('--user')
     parser.add_argument('--password')
@@ -49,15 +56,23 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if args.airflow_postgres_conn_id:
-        connection_dict = create.get_connection_dict_from_airflow(
-            args.airflow_postgres_conn_id
-        )
+    if args.dbtype == 'snowflake':
+        connection_dict = {
+            'user': args.user,
+            'password': args.password or '',
+            'schema': args.source_schema or '',
+            'database': args.database or '',
+            'account': args.account or '',
+            'warehouse': args.warehouse or ''
+        }
     else:
-        connection_dict = {}
-
-    for key in 'host', 'dbname', 'port', 'user', 'password':
-        connection_dict[key] = getattr(args, key)
+        connection_dict = {
+            'host': args.host,
+            'dbname': args.source_schema,
+            'port': args.port,
+            'user': args.login,
+            'password': args.password
+        }
 
     # Convert the aggregate function mappings from a list of key=val items into
     # a dictionary
@@ -65,6 +80,7 @@ if __name__ == '__main__':
     aggfunctions = collections.OrderedDict(aggfunctions)
 
     query = create_pivot_table(
+        args.dbtype,
         connection_dict,
         source_schema=args.source_schema,
         source_table=args.source_table,

@@ -3,10 +3,8 @@
 
 from __future__ import print_function, unicode_literals
 
-import os
 import io
 import re
-import sys
 import itertools
 import collections
 
@@ -35,10 +33,10 @@ aggfunction_mappings = collections.OrderedDict([
     ('total',       ('SUM', 0)),
     ('count',       ('SUM', 0)),
     ('list',        ('LISTAGG', 'NULL')),
-    ('and',         ('BOOL_AND', 'true')),
-    ('bool_and',    ('BOOL_AND', 'true')),
-    ('or',          ('BOOL_OR', 'NULL')),
-    ('bool_or',     ('BOOL_OR', 'NULL'))
+    ('and',         ('MIN', 'true', 'boolean')),
+    ('bool_and',    ('MIN', 'true', 'boolean')),
+    ('or',          ('MAX', 'NULL', 'boolean')),
+    ('bool_or',     ('MAX', 'NULL', 'boolean'))
 ])
 
 table_columns_query = """
@@ -64,13 +62,20 @@ class PrefixNotFoundError(KeyError):
 
 
 def get_aggregate_mapping(name):
+    result = None
     if name in aggfunction_mappings:
-        return aggfunction_mappings[name]
-    for prefix, value in aggfunction_mappings.items():
-        prefix_ = '{}_'.format(prefix)
-        if name.startswith(prefix_):
-            return value
-    raise PrefixNotFoundError(name)
+        result = aggfunction_mappings[name]
+    else:
+        for prefix, value in aggfunction_mappings.items():
+            prefix_ = '{}_'.format(prefix)
+            if name.startswith(prefix_):
+                result = value
+                break
+    if not result:
+        raise PrefixNotFoundError(name)
+    if len(result) < 3:
+        result += (None,)
+    return result
 
 
 def get_columns(cursor, schema, table):
@@ -177,7 +182,7 @@ def pivot_column(column, pivot_columns, distinct_values,
             # value" we can use directly. If it's a string, it's a shorthand we
             # use to perform a second lookup in aggfunction_mappings
             agginfo = aggfunction_mappings[agginfo]
-        sql_agg_function, default = get_aggregate_mapping(agginfo)
+        sql_agg_function, default, cast_to_type = get_aggregate_mapping(agginfo)
     else:
         # Otherwise, try to guess reasonable ones based on the prefix of the
         # column name
@@ -209,12 +214,19 @@ def pivot_column(column, pivot_columns, distinct_values,
         tests.append(' AND '.join(test))
         names.append('_'.join(name))
 
+    expr = column
+    if cast_to_type:
+        expr = '({column})::{cast_to_type}'.format(
+            column=column,
+            cast_to_type=cast_to_type
+        )
+
     result = []
     for test, suffix in zip(tests, names):
-        result.append('{sql_agg_function}(CASE WHEN {test} THEN {column} ELSE {default} END) AS {column}_{suffix}'.format(
+        result.append('{sql_agg_function}(CASE WHEN {test} THEN {expr} ELSE {default} END) AS {column}_{suffix}'.format(
             sql_agg_function=sql_agg_function,
             test=test,
-            column=column,
+            expr=expr,
             default=default,
             suffix=suffix
         ))
