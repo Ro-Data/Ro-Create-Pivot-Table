@@ -5,26 +5,20 @@ import collections
 
 import psycopg2
 
-from generate_pivot_query import _generate_pivot_query
-from create_table_from_select import (
-    create_table_from_select,
-    get_connection_dict_from_airflow
-)
+import generate_pivot_query as generate
+import create_table_from_select as create
 
 
 def _create_pivot_table(cursor, *args, **kwargs):
     schema_name = kwargs['source_schema']
     table_name = kwargs['table_name']
-    pivot_query = _generate_pivot_query(cursor, *args, **kwargs)
-    table_keys = {} # TODO: load these from a file if available
-    create_table_from_select(
+    pivot_query = generate._generate_pivot_query(cursor, *args, **kwargs)
+    create.create_table_from_select(
         cursor,
         pivot_query,
         schema_name,
-        table_name,
-        **table_keys
+        table_name
     )
-
 
 
 def create_pivot_table(connection_dict, *args, **kwargs):
@@ -56,7 +50,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.airflow_postgres_conn_id:
-        connection_dict = get_connection_dict_from_airflow(
+        connection_dict = create.get_connection_dict_from_airflow(
             args.airflow_postgres_conn_id
         )
     else:

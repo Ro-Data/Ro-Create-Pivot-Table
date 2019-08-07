@@ -3,22 +3,20 @@
 
 from __future__ import print_function, unicode_literals
 
-import copy
-
 from airflow.operators.python_operator import PythonOperator
 from airflow.utils.decorators import apply_defaults
 
-from generate_pivot_query import generate_pivot_query
-from create_table_from_select import create_table_from_select
+import generate_pivot_query as generate
+import create_table_from_select as create
 
 
 def create_pivot_table(**kwargs):
-    pivot_query = generate_pivot_query(**kwargs)
-    connection_dict = get_connection_dict()
+    pivot_query = generate.generate_pivot_query(**kwargs)
+    connection_dict = create.get_connection_dict_from_airflow()
     schema_name = kwargs['schema_name']
     table_name = kwargs['table_name']
     table_keys = {} # TODO: load these from a file if available
-    create_table_from_select(
+    create.create_table_from_select(
         connection_dict,
         pivot_query,
         schema_name,
