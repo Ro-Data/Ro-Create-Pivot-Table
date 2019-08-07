@@ -18,19 +18,22 @@ README][ctfs-readme] for more information.
 [ctfs]: https://github.com/Ro-Data/Ro-Create-Table-From-Select
 [ctfs-readme]: https://github.com/Ro-Data/Ro-Create-Table-From-Select/blob/master/README.md
 
-The only database currently supported is Amazon Redshift.
+The only databases currently supported are [Snowflake][snowflakke] and Amazon
+Redshift.
+
+[snowflake]: https://www.snowflake.com
 
 ## Requirements
 
-- [`psycopg2`][psycopg2] is required
-- [`pyyaml`][pyyaml] is required to use the (optional) ability to specify key
-  information
+- [Snowflake Connector for Python][snowflake-connector] is required for
+  Snowflake support
+- [`psycopg2`][psycopg2] is required for Redshift support
 - [`airflow`][airflow] is required to use the (optional)
   `CreatePivotTableOperator` or load database connection information from
   airflow
 
+[snowflake-connector]: https://docs.snowflake.net/manuals/user-guide/python-connector.html
 [psycopg2]: http://initd.org/psycopg/
-[pyyaml]: https://pyyaml.org/
 [airflow]: https://airflow.apache.org/
 
 ## Usage
@@ -62,7 +65,8 @@ to standard output:
 
 ```sh
 python generate_pivot_query.py                  \
-    --dbname mydb --host myhost.url --port 5432 \
+    --dbtype snowflake --database mydb          \
+    --host myhost.url --port 5432               \
     --user me --password myp4ssw0rd             \
     --base-columns customer_id                  \
     --pivot_columns category                    \
@@ -96,7 +100,8 @@ pivot table under e.g. `orders_summary`:
 
 ```sh
 python create_pivot_table.py                    \
-    --dbname mydb --host myhost.url --port 5432 \
+    --dbtype snowflake --database mydb          \
+    --host myhost.url --port 5432               \
     --user me --password myp4ssw0rd             \
     --base-columns customer_id                  \
     --pivot_columns category                    \
@@ -117,7 +122,7 @@ from create_pivot_table_operator import CreatePivotTableOperator
 
 default_args = {
     # ...
-    'postgres_conn_id': 'my-postgress-conn-id'
+    'snowflake_conn_id': 'my-snowflake-conn-id'
 }
 
 dag = DAG(
@@ -157,8 +162,8 @@ with a default of `0`. The currently supported options are:
 | min     | `MIN`      | `NULL`  |
 | sum     | `SUM`      | `0`     |
 | list    | `LISTAGG`  | `NULL`  |
-| and     | `BOOL_AND` | `true`  |
-| or      | `BOOL_OR`  | `NULL`  |
+| and     | `MIN`      | `true`  |
+| or      | `MAX`      | `NULL`  |
 
 If a column isn't explicitly specified in `aggfunction_mapping`, the script will
 attempt to guess a reasonable choice based on the column's name. For example,
